@@ -1,2 +1,2 @@
 # LUNA
-AI Spotlight for Ubuntu 
+Virtual Assistant
