@@ -1,5 +1,5 @@
 .hidden/
-SpeakerVerDataset/
+*SpeakerVerDataset/
 *SpeakerVerifocation.ipynb
 LUNA.png
 splitword.py
