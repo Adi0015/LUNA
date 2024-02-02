@@ -25,10 +25,14 @@ recognizer = KaldiRecognizer(model, 16000)
 listener = sr.Recognizer()
 ssl._create_default_https_context = ssl._create_unverified_context
 model = whisper.load_model("tiny", device="cpu")
+mic = pyaudio.PyAudio() 
+stream = mic.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=8192)
+# stream.start_stream()
 
 # ! Variable to store connection status
-connected = False  
-
+verification = False
+connected = True  
+audio_chunks = []
 #! Check if the system is connected to the internet and update 'connected'
 def is_connected():
     global connected
@@ -49,15 +53,20 @@ connection_thread.start()
 #! Function to get microphone input when the system is offline
 def offline_mic_input():
     try:
-        with pyaudio.PyAudio() as mic:
-            stream = mic.open(format=pyaudio.paInt16, channels=1, rate=16000, input=True, frames_per_buffer=8192)
-            stream.start_stream()
-            data = stream.read(4096)
+        with stream.start_stream():
+            data = stream.read(45000)
             if recognizer.AcceptWaveform(data):
                 text = recognizer.Result()
-                text = text[14:3].lower()
                 print(text)
-                return text
+                if 'luna' in text:
+                    # Save the current chunk for verification
+                    audio_chunks.append(np.frombuffer(data, dtype=np.int16))
+                    audio_data = np.concatenate(audio_chunks) 
+                    # audio_chunks = []
+                    verification_thread = threading.Thread(target=speaker_verification,args=(audio_data,))
+                    verification_thread.start()
+            stream.stop_stream()
+            return text[14:3].lower()
     except Exception:
         pass
         luna_output()
@@ -70,11 +79,12 @@ def online_mic_input():
             listener.adjust_for_ambient_noise(source, duration=0.2)
             listener.dynamic_energy_threshold = True
             audio = listener.listen(source, timeout=7, phrase_time_limit=7)
+            audio_data = audio.get_wav_data()
             x = listener.recognize_google(audio, language='eg-in')
             text = x.lower()
             print(text)
             if 'luna' in text:
-                verification_thread = threading.Thread(target=speaker_verification, args=(audio,))
+                verification_thread = threading.Thread(target=speaker_verification, args=(audio_data))
                 verification_thread.start()
             return text
             
@@ -95,8 +105,8 @@ def luna_timestamp(audio):
                         return start_time.astype(float), end_time.astype(float)
 
 #! Function for speaker verification
-def speaker_verification(audio):
-    audio_data = audio.get_wav_data()
+def speaker_verification(audio_data):
+    # audio_data = audio.get_wav_data()
     audio_buffer = io.BytesIO()
     with wave.open(audio_buffer, "wb") as wf:
         wf.setnchannels(1)
@@ -105,6 +115,7 @@ def speaker_verification(audio):
         wf.writeframes(audio_data)
     audio_buffer.seek(0)
     audio_segment = AudioSegment.from_wav(audio_buffer)
+    play(audio_segment)
     audio_df = audio_segment[0:]
     audio_df.export(".hidden/luna_audio.wav", format="wav")
     audio = whisper.load_audio(".hidden/luna_audio.wav")
@@ -128,8 +139,9 @@ def audio_preprocessing(audio_file):
     df['Time'] = librosa.frames_to_time(np.arange(len(df)), sr=sr)
     df["ID"] = 0.0
     x_test = scale_dataset(df, oversample=False) 
-    verified = model_prediction(x_test)
-    return verified
+    global verification
+    verification = model_prediction(x_test)
+    return verification
     
 #! Scale the dataset for speaker verification.
 def scale_dataset(dataframe, oversample=False):
@@ -167,7 +179,7 @@ def model_prediction(x_test_set):
         return False
     
 #!  Voice training
-#* def trainVoice():
+# * def trainVoice():
     
 #!  Determine the appropriate mic input method based on the connection status.
 def luna_output():
@@ -179,6 +191,7 @@ def luna_output():
 
 # ! Main function to continuously run the code
 def luna():
+    print(verification)
     while True:
         mic_text = luna_output()
         if 'luna' in mic_text:
