@@ -1,36 +1,49 @@
-import time
-from transformers import pipeline
-import soundfile as sf
 import speech_recognition as sr
-import whisper
+import ssl
+import whisper_timestamped as whisper
+import numpy as np
+import torch
 
-# Load the OpenAI Whisper ASR model
-transcriber = pipeline("automatic-speech-recognition", model="openai/whisper-base.en")
+listener = sr.Recognizer()
+ssl._create_default_https_context = ssl._create_unverified_context
 
-# Use the microphone to capture audio
-with sr.Microphone() as source:
-    listener = sr.Recognizer()
-    listener.energy_threshold = 4000
-    listener.adjust_for_ambient_noise(source, duration=0.2)
-    listener.dynamic_energy_threshold = True
-    print("Say something:")
-    audio = listener.listen(source, timeout=7, phrase_time_limit=7)
+language = "en"
+model = "small.en"
+model_path = "./model"
 
-# Convert the audio data to a NumPy array
-audio_data = audio.get_wav_data()
+device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Loading whisper {model} model {language}...")
+audio_model = whisper.load_model(model, download_root=model_path, device=device)
 
-# Benchmark recognize_google
-start_time = time.time()
-x = listener.recognize_google(audio, language='eg-in')
-google_transcription_time = time.time() - start_time
+def transcribe_audio(audio_np):
+    # Convert NumPy array to PyTorch tensor
+    audio_tensor = torch.from_numpy(audio_np)
+    audio_tensor = audio_tensor.to(torch.float32) / 32768.0
+    audio_tensor = audio_tensor.to(device)
 
-# Benchmark whisper.transcriber
-start_time = time.time()
-transcription = transcriber(audio_data)
-whisper_transcription_time = time.time() - start_time
+    # Transcribe audio using Whisper model
+    result = audio_model.transcribe(audio_tensor, language=language, fp16=torch.cuda.is_available())
+    text = result['text'].strip()
+    return text
 
-print("recognize_google Transcription:", x.lower())
-print("whisper.transcriber Transcription:", transcription["text"].lower())
+while True:
+    try:
+        with sr.Microphone(sample_rate=24000) as source:
+            listener.energy_threshold = 4000
+            listener.adjust_for_ambient_noise(source, duration=0.2)
+            listener.dynamic_energy_threshold = True
+            print("Say something...")
 
-print("Time taken for recognize_google:", google_transcription_time, "seconds")
-print("Time taken for whisper.transcriber:", whisper_transcription_time, "seconds")
+            # Record audio until a pause is detected
+            audio_data = listener.listen(source, timeout=None, phrase_time_limit=7)
+
+            # Convert audio data to NumPy array
+            raw_audio_data = audio_data.get_raw_data(convert_rate=24000, convert_width=2)
+            audio_np = np.frombuffer(raw_audio_data, dtype=np.int16)
+
+            # Transcribe the audio using Whisper model
+            text_whisper = transcribe_audio(audio_np)
+            print(f"Whisper Transcription: {text_whisper}")
+
+    except Exception as e:
+        print(f"An error occurred: {e}")
