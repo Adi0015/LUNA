@@ -1,10 +1,4 @@
-keyboard==0.13.5
-psutil==5.9.5
-pyautogui==0.9.54
-pygame==2.5.2
-pyttsx3==2.90
-pywhatkit==5.4
-Requests==2.31.0
-screen_brightness_control==0.22.1
-SpeechRecognition==3.10.1
-Pyaudio==0.2.14
+pip==23.1.2
+pipdeptree==2.16.1
+setuptools==65.5.0
+

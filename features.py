@@ -13,6 +13,5 @@ import os
 #! volume control
 #! brightness control
 #! creating file,folder
-
 #! log of luna
 

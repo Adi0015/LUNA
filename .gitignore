@@ -1,7 +1,3 @@
-.hidden/
-model/
-*SpeakerVerDataset/
-*SpeakerVerifocation.ipynb
-LUNA.png
-splitword.py
-.DS_Store
+setup.py
+/dumpo
+/env
