@@ -15,7 +15,7 @@ stt =  SpeechToText()
 class Registration():
 
   def __init__(self) :
-      self.registerd =False 
+      # self.registerd =False 
       self.trainingData = Queue()
       self.mfccsData = Queue()
       self.i = 0
@@ -38,7 +38,7 @@ class Registration():
         for spoof in spoofs:
           data.append((self.mfccsData.get(), np.array([1]).astype(np.float32)))
           data.append((spoof.astype(np.float32), np.array([0]).astype(np.float32)))
-
+        # print(data)
         # with open('mfcc_data.pkl', 'wb') as f:
         #   pickle.dump(data, f)
         train_data = data[:8]
@@ -47,9 +47,10 @@ class Registration():
         val_mfcc, val_labels = zip(*val_data)
         train_labels = np.array(train_labels)
         val_labels = np.array(val_labels)
-        max_length = max(len(seq) for seq in train_mfcc + val_mfcc)
-        train_mfcc_padded = np.array([np.pad(seq, (0, max_length - len(seq)), mode='constant') for seq in train_mfcc])
-        val_mfcc_padded = np.array([np.pad(seq, (0, max_length - len(seq)), mode='constant') for seq in val_mfcc])
+        max_length = 400
+        train_mfcc_padded = np.array([np.pad(seq, (0, max_length - len(seq)), mode='constant') if len(seq) < max_length else seq[:max_length] for seq in train_mfcc])
+        val_mfcc_padded = np.array([np.pad(seq, (0, max_length - len(seq)), mode='constant') if len(seq) < max_length else seq[:max_length] for seq in val_mfcc])
+        # print(train_mfcc_padded)
         self.saveModel(max_length,train_mfcc_padded,train_labels,val_mfcc_padded,val_labels)
 
   def saveModel(self,max_length,train_mfcc_padded,train_labels,val_mfcc_padded,val_labels):
@@ -62,14 +63,14 @@ class Registration():
       model.add(Dense(32, activation='relu'))
       # model.add(Dropout(0.1))
       model.add(Dense(1, activation='sigmoid'))  # Output layer for binary classification
-      model.compile(optimizer=keras.optimizers.legacy.Adam(learning_rate=0.05),
+      model.compile(optimizer=keras.optimizers.Adam(learning_rate=0.05),
                           loss='binary_crossentropy',
                           metrics=['accuracy'])
 
       early_stopping = EarlyStopping(monitor='val_loss', patience=10)
 
-      history = model.fit(train_mfcc_padded, train_labels, epochs=100, batch_size=32, validation_data=(val_mfcc_padded, val_labels), callbacks=[early_stopping])
-      history.model.fit(train_mfcc_padded, train_labels, epochs=100, batch_size=32, validation_data=(val_mfcc_padded, val_labels), callbacks=[early_stopping])
+      history = model.fit(train_mfcc_padded, train_labels, epochs=500, batch_size=32, validation_data=(val_mfcc_padded, val_labels), callbacks=[early_stopping])
+      history.model.fit(train_mfcc_padded, train_labels, epochs=500, batch_size=32, validation_data=(val_mfcc_padded, val_labels), callbacks=[early_stopping])
       if not os.path.exists(f"{self.path}/voiceModel"):
             os.makedirs(f"{self.path}/voiceModel")
       model.save(f"{self.path}/voiceModel/model.keras")

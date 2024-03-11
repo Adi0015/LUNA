@@ -1,7 +1,8 @@
 import os
 
 
-
+#// speaker verification 
+#// speaker registration
 #! file search 
 #! file opening 
 #! file closing

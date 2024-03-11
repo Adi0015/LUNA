@@ -19,8 +19,9 @@ def luna():
 
 def textToAction():
     text = stt.display()
-    print(text)
+    # print(text)
     if text != '' and text.split()[0] in ["luna", "luna.","luna,"]: 
+        stt.verified()
         print(text)
         if 'register' in text :
           registration.train_My_Voice()

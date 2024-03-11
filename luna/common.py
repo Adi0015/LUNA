@@ -5,6 +5,10 @@ import numpy as np
 import speech_recognition as sr 
 from queue import Queue ,	LifoQueue
 import whisper_timestamped as whisper
+from spea_verif import Verification
+
+
+verification = Verification()
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -20,6 +24,7 @@ class SpeechToText:
 			self.FRAME_RATE = 16000
 			self.SAMPLE_SIZE = 2
 			self.CHUNKS = 1024
+			self.MAX_LENGTH = 300
 			self.load_whisper_model()
 		
 
@@ -36,7 +41,7 @@ class SpeechToText:
 						self.LISTENER.energy_threshold = 500
 						self.LISTENER.adjust_for_ambient_noise(source, duration=0.5)
 						print("->")
-						audio = self.LISTENER.listen(source,)
+						audio = self.LISTENER.listen(source,timeout=10)
 						data = audio.frame_data
 						frames.append(data)
 						SpeechToText.addNewAudio(self,frames.copy())
@@ -65,10 +70,36 @@ class SpeechToText:
 					np_data = np.frombuffer(frames,dtype=np.int16, count=len(frames)//2, offset=0)
 					np_data	= np_data.astype(np.float32, order='C') / 32768.0
 					self.result = whisper.transcribe(self.model,np_data, language="en")
+					print(self.result)
 					text = self.result["text"]
 					self.TEXT.put(text.lower())
-					# SpeechToText.checkLuna(data,text,result)
+					
 
+					
+					# status = verification.verifiedStatus
+					# print(status)
+					
+					# SpeechToText.checkLuna(data,text,result)
+		def verified(self):
+				frames = b''.join(self.data)
+				timestamp = verification.get_Timestamps(self.result) 
+				print(timestamp)
+				extractedData = verification.extracted_Frame(frames,timestamp[0],timestamp[1])
+				# print(type(extractedData))
+				mfcc =verification.compute_MFCCs(extractedData)
+				# file_path = "mfcc_values.txt"
+				# np.savetxt(file_path, mfcc)
+				print(len(mfcc))
+				data=[]
+				data.append((mfcc))
+				# mfcc_data =zip(*data)
+				mfcc_data =	data
+				# print(mfcc_data)
+				# Save the MFCC data to a text file
+				mfcc_padded  = np.array([np.pad(seq, (0, self.MAX_LENGTH - len(seq)), mode='constant') if len(seq) < self.MAX_LENGTH else seq[:self.MAX_LENGTH] for seq in mfcc_data])
+				# print(mfcc_padded)
+				verification.get_verified(mfcc_padded)
+				print(verification.verifiedStatus)
 
 		def display(self):
 			if not self.TEXT.empty():

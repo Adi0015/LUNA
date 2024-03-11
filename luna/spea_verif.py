@@ -1,6 +1,8 @@
 import librosa
 import numpy as np 
-from common import SpeechToText
+import  os
+# from common import SpeechToText
+from tensorflow.keras.models import load_model
 from sklearn.preprocessing import StandardScaler,MinMaxScaler
 
 # stt = SpeechToText()
@@ -11,9 +13,20 @@ class Verification():
   def __init__(self) :
     # self.verifiedStatus =  False
     self.n_mfcc=20  
+    self.path = os.path.join(os.path.expanduser("~"), ".config", "luna")
     self.FRAME_RATE = 16000
     self.SAMPLE_SIZE = 2
+    self.load_Keras_Model()
   
+  def load_Keras_Model(self):
+      if not os.path.exists(f"{self.path}/voiceModel/model.keras"):
+         self.verifiedStatus = False
+         self.kerasModel = ''
+         print("you have not registered ur voice")
+      else : self.kerasModel=load_model(f"{self.path}/voiceModel/model.keras")
+     
+
+
   def get_Timestamps(self,result):
     segments = result.get("segments", [])
     for segment in segments:
@@ -23,6 +36,7 @@ class Verification():
                 start_time = word["start"]
                 end_time = word["end"]
                 return float(start_time), float(end_time)
+            else: return float(0),float(0)
 
   def extracted_Frame(self,audioframeData,start_time,end_time):
       start_index = int(start_time*self.FRAME_RATE*self.SAMPLE_SIZE)
@@ -46,7 +60,12 @@ class Verification():
       mfccs_flat = self.normalize_Data(mfcc=mfccs)
       return mfccs_flat
 
-
-
-
+  def get_verified(self,data):
+    if self.kerasModel != '':
+       prediction = self.kerasModel.predict(data)
+       print(prediction)
+       result = (prediction > 0.5).astype(int).reshape(-1,)
+       if result == 1: self.verifiedStatus=True
+       else : self.verifiedStatus=False
+    
 
